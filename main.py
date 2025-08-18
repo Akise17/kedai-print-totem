@@ -1,6 +1,7 @@
 import sys
 import platform
 import os
+import threading
 import dotenv
 import paho.mqtt.client as mqtt
 import time
@@ -52,7 +53,7 @@ if OS == "Linux":
             if key == "ENTER":
               if barcode:
                 print("Scanned:", barcode)
-                publish_qr_scanned(client, barcode)  # kirim via MQTT
+                publish_status("scanner", "scan_completed", f"Scanned: {barcode}")
               barcode = ""
             else:
               barcode += key
@@ -162,8 +163,12 @@ if __name__ == "__main__":
   client.connect(MQTT_HOST, MQTT_PORT, 60)
   client.loop_start()
 
+  scanner_thread = threading.Thread(target=listen_scanner, daemon=True)
+  scanner_thread.start()
+
   try:
-    listen_scanner()
+    while True:
+      time.sleep(1)
   except KeyboardInterrupt:
     print("\n[MQTT] Stopping...")
   finally:
