@@ -7,7 +7,7 @@ if OS == "Linux":
     import evdev
     from evdev import InputDevice, categorize, ecodes, list_devices
 
-    DEVICE_NAME = "Serial To HID"  # Ganti dengan nama scanner yang sesuai
+    DEVICE_NAME = "WCH.CN 8 Serial To HID"  # Ganti dengan nama scanner yang sesuai
 
     def find_scanner():
         devices = [InputDevice(path) for path in list_devices()]
