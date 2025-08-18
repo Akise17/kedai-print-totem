@@ -6,6 +6,8 @@ import paho.mqtt.client as mqtt
 import time
 from datetime import datetime
 import json
+import glob
+from escpos.printer import File, Serial
 
 from dotenv import load_dotenv
 
@@ -14,7 +16,9 @@ load_dotenv()
 MQTT_HOST = os.getenv("MQTT_HOST")
 MQTT_PORT = int(os.getenv("MQTT_PORT"))
 MQTT_TOPIC_SCANNER = os.getenv("MQTT_TOPIC_SCANNER", "scanner/data")
-MQTT_TOPIC_PRINT = os.getenv("MQTT_TOPIC_PRINT", "print")
+MQTT_TOPIC_PRINT = os.getenv("MQTT_TOPIC_PRINT", "print_data")
+MQTT_TOPIC_PRINT_RECEIVED = os.getenv("MQTT_TOPIC_PRINT", "print_received")
+MQTT_TOPIC_PRINT_COMPLETED = os.getenv("MQTT_TOPIC_PRINT", "print_completed")
 
 OS = platform.system()
 
@@ -33,63 +37,60 @@ if OS == "Linux":
         return None
 
     def listen_scanner():
-        scanner = find_scanner()
-        if not scanner:
-            print("Scanner tidak ditemukan di Linux!")
-            sys.exit(1)
+      scanner = find_scanner()
+      if not scanner:
+        print("Scanner tidak ditemukan di Linux!")
+        sys.exit(1)
 
-        print(f"Listening on {scanner.name} ({scanner.path})")
-        barcode = ""
-        for event in scanner.read_loop():
-            if event.type == ecodes.EV_KEY:
-                data = categorize(event)
-                if data.keystate == 1:  # key down
-                    key = evdev.ecodes.KEY[data.scancode].replace("KEY_", "")
-                    if key == "ENTER":
-                        if barcode:
-                            print("Scanned:", barcode)
-                            publish_qr_scanned(client, barcode)  # kirim via MQTT
-                        barcode = ""
-                    else:
-                        barcode += key
+      print(f"Listening on {scanner.name} ({scanner.path})")
+      barcode = ""
+      for event in scanner.read_loop():
+        if event.type == ecodes.EV_KEY:
+          data = categorize(event)
+          if data.keystate == 1:  # key down
+            key = evdev.ecodes.KEY[data.scancode].replace("KEY_", "")
+            if key == "ENTER":
+              if barcode:
+                print("Scanned:", barcode)
+                publish_qr_scanned(client, barcode)  # kirim via MQTT
+              barcode = ""
+            else:
+              barcode += key
 
-elif OS == "Darwin":  # macOS
-  import hid
-  from dotenv import load_dotenv
-  import os
+    def find_printer_device():
+      usb_lp = sorted(glob.glob("/dev/usb/lp*"))
+      if usb_lp:
+          return ("file", usb_lp[0])
 
-  VENDOR_ID = 6790   # ganti hasil dari ioreg
-  PRODUCT_ID = 57382  # ganti hasil dari ioreg
+      tty_usb = sorted(glob.glob("/dev/ttyUSB*"))
+      if tty_usb:
+          return ("serial", tty_usb[0])
 
-  def find_scanner():
-      for d in hid.enumerate():
-          print(f"[macOS] VendorID: {d['vendor_id']}, ProductID: {d['product_id']}, Name: {d['product_string']}")
-          if d['vendor_id'] == VENDOR_ID and d['product_id'] == PRODUCT_ID:
-              return d
-      return None
-
-  def listen_scanner():
-    scanner_info = find_scanner()
-    if not scanner_info:
-        print("Scanner tidak ditemukan di macOS!")
-        return
-
-    scanner = hid.Device(path=scanner_info['path'])
-    print("Listening on", scanner_info['product_string'])
-
-    while True:
-      data = scanner.read(64)
-      if data:
-        # misal parse ke string QR
-        qr_code = "".join([chr(x) for x in data if x > 0])
-        if qr_code.strip():
-          print("Scanned:", qr_code)
-          publish_qr_scanned(client, qr_code)
+      return (None, None)
 
 else:
     print(f"OS {OS} belum didukung!")
     sys.exit(1)
 
+def get_printer():
+  mode, device = find_printer_device()
+  if not device:
+      raise RuntimeError("No printer device found!")
+
+  print(f"[PRINTER] Using {mode.upper()} mode on {device}")
+
+  if mode == "file":
+      return File(device)
+  elif mode == "serial":
+      return Serial(
+          devfile=device,
+          baudrate=9600,
+          bytesize=8,
+          parity='N',
+          stopbits=1,
+          timeout=1.00
+      )
+    
 def on_connect(client, userdata, flags, reason_code, properties=None):
   if reason_code == 0:
       print("[MQTT] Connected successfully!")
@@ -100,14 +101,57 @@ def on_connect(client, userdata, flags, reason_code, properties=None):
 def on_message(client, userdata, msg):
   print(f"[MQTT] Received message on {msg.topic}: {msg.payload.decode()}")
 
+  try:
+    data = json.loads(msg.payload.decode())
+  except Exception as e:
+    print("[MQTT] Invalid JSON:", e)
+    return
+
+  if data.get("type") == "print_data":
+    print("[PRINT] Processing print job...")
+    publish_status(MQTT_TOPIC_PRINT_RECEIVED, "print_received", "Print job received")
+    print_data = data.get("printData", {})
+
+    text = (
+        "===== RECEIPT =====\n"
+        f"User: {print_data.get('userName','')}\n"
+        f"Merchant: {print_data.get('merchName','')}\n"
+        f"Credit Used: {print_data.get('creditUsed','')}\n"
+        f"Remaining: {print_data.get('remainingCredit','')}\n"
+        f"Receipt ID: {print_data.get('receiptId','')}\n"
+        f"Time: {print_data.get('timestamp','')}\n"
+        "===================\n\n"
+    )
+
+    try:
+        printer = get_printer()
+        printer.text(text)
+        printer.cut()
+        print("[PRINT] Print job sent successfully")
+        publish_status(MQTT_TOPIC_PRINT_COMPLETED, "print_completed", "Print job completed successfully")
+
+    except Exception as e:
+        print("[PRINT] Error printing:", e)
+        publish_status(MQTT_TOPIC_PRINT_COMPLETED, "print_completed", f"Print job failed: {e}", False)
+
 def publish_qr_scanned(client, qr_code):
-    data = {
-      "type": "qr_scanned",
-      "qrData": qr_code,
+  data = {
+    "type": "qr_scanned",
+    "qrData": qr_code,
+    "timestamp": datetime.utcnow().isoformat() + "Z"
+  }
+  client.publish("print", json.dumps(data))
+  print(f"[MQTT] Published QR scan: {data}")
+
+def publish_status(topic, status_type, message, success=True):
+  payload = {
+      "type": status_type,
+      "success": success,
+      "message": message,
       "timestamp": datetime.utcnow().isoformat() + "Z"
-    }
-    client.publish("print", json.dumps(data))
-    print(f"[MQTT] Published QR scan: {data}")
+  }
+  client.publish(topic, json.dumps(payload))
+  print(f"[MQTT] Published to {topic}: {payload}")
 
 if __name__ == "__main__":
   client = mqtt.Client()
