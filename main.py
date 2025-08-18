@@ -118,8 +118,7 @@ if __name__ == "__main__":
   client.loop_start()
 
   try:
-    while True:
-      time.sleep(1)  # keep main thread alive
+    listen_scanner()
   except KeyboardInterrupt:
     print("\n[MQTT] Stopping...")
   finally:
