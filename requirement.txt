@@ -1,0 +1,5 @@
+# Linux dependencies
+evdev; sys_platform == "linux"
+
+# macOS dependencies
+hid; sys_platform == "darwin"
