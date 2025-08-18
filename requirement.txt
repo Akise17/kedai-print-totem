@@ -6,3 +6,5 @@ hid; sys_platform == "darwin"
 
 dotenv
 paho-mqtt
+python-escpos
+pyserial
