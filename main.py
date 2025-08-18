@@ -7,11 +7,13 @@ if OS == "Linux":
     import evdev
     from evdev import InputDevice, categorize, ecodes, list_devices
 
+    DEVICE_NAME = "Serial To HID"  # Ganti dengan nama scanner yang sesuai
+
     def find_scanner():
         devices = [InputDevice(path) for path in list_devices()]
         for device in devices:
             print(f"[Linux] Found: {device.name} at {device.path}")
-            if "Scanner" in device.name or "Barcode" in device.name or "RFID" in device.name:
+            if device.name == DEVICE_NAME:
                 return device
         return None
 
