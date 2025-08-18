@@ -4,7 +4,7 @@ import os
 import dotenv
 import paho.mqtt.client as mqtt
 import time
-import datetime
+from datetime import datetime
 
 from dotenv import load_dotenv
 
