@@ -15,7 +15,7 @@ load_dotenv()
 
 MQTT_HOST = os.getenv("MQTT_HOST")
 MQTT_PORT = int(os.getenv("MQTT_PORT"))
-MQTT_TOPIC_SCANNER = os.getenv("MQTT_TOPIC_SCANNER", "scanner/data")
+MQTT_TOPIC_SCANNER = os.getenv("MQTT_TOPIC_SCANNER", "qr_scanned")
 MQTT_TOPIC_PRINT = os.getenv("MQTT_TOPIC_PRINT", "print_data")
 MQTT_TOPIC_PRINT_RECEIVED = os.getenv("MQTT_TOPIC_PRINT", "print_received")
 MQTT_TOPIC_PRINT_COMPLETED = os.getenv("MQTT_TOPIC_PRINT", "print_completed")
