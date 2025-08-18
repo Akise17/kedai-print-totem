@@ -140,7 +140,7 @@ def publish_qr_scanned(client, qr_code):
     "qrData": qr_code,
     "timestamp": datetime.utcnow().isoformat() + "Z"
   }
-  client.publish("print", json.dumps(data))
+  client.publish(MQTT_TOPIC_SCANNER, json.dumps(data))
   print(f"[MQTT] Published QR scan: {data}")
 
 def publish_status(topic, status_type, message, success=True):
