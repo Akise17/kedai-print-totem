@@ -2,14 +2,12 @@ import sys
 import platform
 import os
 import threading
-import dotenv
 import paho.mqtt.client as mqtt
 import time
 from datetime import datetime
 import json
 import glob
 from escpos.printer import File, Serial
-
 from dotenv import load_dotenv
 
 load_dotenv()
@@ -24,50 +22,50 @@ MQTT_TOPIC_PRINT_COMPLETED = os.getenv("MQTT_TOPIC_PRINT", "print_completed")
 OS = platform.system()
 
 if OS == "Linux":
-    import evdev
-    from evdev import InputDevice, categorize, ecodes, list_devices
+  import evdev
+  from evdev import InputDevice, categorize, ecodes, list_devices
 
-    DEVICE_NAME = "WCH.CN 8\x0f Serial To HID"  # Ganti dengan nama scanner yang sesuai
+  DEVICE_NAME = "WCH.CN 8\x0f Serial To HID"  # Ganti dengan nama scanner yang sesuai
 
-    def find_scanner():
-        devices = [InputDevice(path) for path in list_devices()]
-        for d in devices:
-            print(f"[Linux] Found: {d.name} at {d.path}")
-            if d.name == DEVICE_NAME:
-                return d
-        return None
+  def find_scanner():
+      devices = [InputDevice(path) for path in list_devices()]
+      for d in devices:
+          print(f"[Linux] Found: {d.name} at {d.path}")
+          if d.name == DEVICE_NAME:
+              return d
+      return None
 
-    def listen_scanner():
-      scanner = find_scanner()
-      if not scanner:
-        print("Scanner tidak ditemukan di Linux!")
-        sys.exit(1)
+  def listen_scanner():
+    scanner = find_scanner()
+    if not scanner:
+      print("Scanner tidak ditemukan di Linux!")
+      sys.exit(1)
 
-      print(f"Listening on {scanner.name} ({scanner.path})")
-      barcode = ""
-      for event in scanner.read_loop():
-        if event.type == ecodes.EV_KEY:
-          data = categorize(event)
-          if data.keystate == 1:  # key down
-            key = evdev.ecodes.KEY[data.scancode].replace("KEY_", "")
-            if key == "ENTER":
-              if barcode:
-                print("Scanned:", barcode)
-                publish_status("scanner", "scan_completed", f"Scanned: {barcode}")
-              barcode = ""
-            else:
-              barcode += key
+    print(f"Listening on {scanner.name} ({scanner.path})")
+    barcode = ""
+    for event in scanner.read_loop():
+      if event.type == ecodes.EV_KEY:
+        data = categorize(event)
+        if data.keystate == 1:  # key down
+          key = evdev.ecodes.KEY[data.scancode].replace("KEY_", "")
+          if key == "ENTER":
+            if barcode:
+              print("Scanned:", barcode)
+              publish_status("scanner", "scan_completed", f"Scanned: {barcode}")
+            barcode = ""
+          else:
+            barcode += key
 
-    def find_printer_device():
-      usb_lp = sorted(glob.glob("/dev/usb/lp*"))
-      if usb_lp:
-          return ("file", usb_lp[0])
+  def find_printer_device():
+    usb_lp = sorted(glob.glob("/dev/usb/lp*"))
+    if usb_lp:
+        return ("file", usb_lp[0])
 
-      tty_usb = sorted(glob.glob("/dev/ttyUSB*"))
-      if tty_usb:
-          return ("serial", tty_usb[0])
+    tty_usb = sorted(glob.glob("/dev/ttyUSB*"))
+    if tty_usb:
+        return ("serial", tty_usb[0])
 
-      return (None, None)
+    return (None, None)
 
 else:
     print(f"OS {OS} belum didukung!")
@@ -95,7 +93,7 @@ def get_printer():
 def on_connect(client, userdata, flags, reason_code, properties=None):
   if reason_code == 0:
       print("[MQTT] Connected successfully!")
-      client.subscribe("print")
+      client.subscribe(MQTT_TOPIC_PRINT)
   else:
       print(f"[MQTT] Failed to connect, reason code {reason_code}")
 
