@@ -7,14 +7,14 @@ if OS == "Linux":
     import evdev
     from evdev import InputDevice, categorize, ecodes, list_devices
 
-    DEVICE_NAME = "WCH.CN 8 Serial To HID"  # Ganti dengan nama scanner yang sesuai
+    DEVICE_NAME = "WCH.CN 8\x0f Serial To HID"  # Ganti dengan nama scanner yang sesuai
 
     def find_scanner():
         devices = [InputDevice(path) for path in list_devices()]
-        for device in devices:
-            print(f"[Linux] Found: {device.name} at {device.path}")
-            if device.name == DEVICE_NAME:
-                return device
+        for d in devices:
+            print(f"[Linux] Found: {d.name} at {d.path}")
+            if d.name == DEVICE_NAME:
+                return d
         return None
 
     def listen_scanner():
