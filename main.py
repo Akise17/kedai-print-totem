@@ -158,6 +158,7 @@ def on_message(client, userdata, msg):
         printer.cut()
         print("[PRINT] Print job sent successfully")
         publish_status(MQTT_TOPIC_PRINT_COMPLETED, "print_completed", "Print job completed successfully")
+        printer.close()
 
     except Exception as e:
         print("[PRINT] Error printing:", e)
