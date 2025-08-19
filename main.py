@@ -25,13 +25,13 @@ if OS == "Linux":
   import evdev
   from evdev import InputDevice, categorize, ecodes, list_devices
 
-  DEVICE_NAME = "WCH.CN 8\x0f Serial To HID"  # Ganti dengan nama scanner yang sesuai
+  DEVICE_NAME = ["WCH.CN 8\x0f Serial To HID", "BARCODE SCANNER Keyboard Interface"]
 
   def find_scanner():
       devices = [InputDevice(path) for path in list_devices()]
       for d in devices:
           print(f"[Linux] Found: {d.name} at {d.path}")
-          if d.name == DEVICE_NAME:
+          if d.name in DEVICE_NAME:
               return d
       return None
 
