@@ -43,18 +43,48 @@ if OS == "Linux":
 
     print(f"Listening on {scanner.name} ({scanner.path})")
     barcode = ""
+    shift_pressed = False
+    SHIFT_KEYS = [42, 54]
+
+    unshifted_map = {
+      'A':'a','B':'b','C':'c','D':'d','E':'e','F':'f','G':'g','H':'h',
+      'I':'i','J':'j','K':'k','L':'l','M':'m','N':'n','O':'o','P':'p',
+      'Q':'q','R':'r','S':'s','T':'t','U':'u','V':'v','W':'w','X':'x',
+      'Y':'y','Z':'z',
+      '1':'1','2':'2','3':'3','4':'4','5':'5','6':'6','7':'7','8':'8','9':'9','0':'0',
+      'MINUS':'-','EQUAL':'=','LEFTBRACE':'[','RIGHTBRACE':']','BACKSLASH':'\\',
+      'SEMICOLON':';','APOSTROPHE':'\'','GRAVE':'`','COMMA':',','DOT':'.','SLASH':'/'
+    }
+
+    shifted_map = {
+        'A':'A','B':'B','C':'C','D':'D','E':'E','F':'F','G':'G','H':'H',
+        'I':'I','J':'J','K':'K','L':'L','M':'M','N':'N','O':'O','P':'P',
+        'Q':'Q','R':'R','S':'S','T':'T','U':'U','V':'V','W':'W','X':'X',
+        'Y':'Y','Z':'Z',
+        '1':'!','2':'@','3':'#','4':'$','5':'%','6':'^','7':'&','8':'*','9':'(','0':')',
+        'MINUS':'_','EQUAL':'+','LEFTBRACE':'{','RIGHTBRACE':'}','BACKSLASH':'|',
+        'SEMICOLON':':','APOSTROPHE':'"','GRAVE':'~','COMMA':'<','DOT':'>','SLASH':'?'
+    }
+
     for event in scanner.read_loop():
       if event.type == ecodes.EV_KEY:
         data = categorize(event)
+
+        # Track shift state
+        if data.scancode in SHIFT_KEYS:
+          shift_pressed = data.keystate == 1
+          continue
+
         if data.keystate == 1:  # key down
           key = evdev.ecodes.KEY[data.scancode].replace("KEY_", "")
+
           if key == "ENTER":
-            if barcode:
-              print("Scanned:", barcode)
-              publish_qr_scanned(barcode)
+            print("Scanned QR:", barcode)
+            publish_qr_scanned(barcode)
             barcode = ""
           else:
-            barcode += key
+            char = shifted_map[key] if shift_pressed else unshifted_map.get(key, key)
+            barcode += char
 
   def find_printer_device():
     usb_lp = sorted(glob.glob("/dev/usb/lp*"))
