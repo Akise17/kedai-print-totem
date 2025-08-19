@@ -51,7 +51,7 @@ if OS == "Linux":
           if key == "ENTER":
             if barcode:
               print("Scanned:", barcode)
-              publish_status("scanner", "scan_completed", f"Scanned: {barcode}")
+              publish_qr_scanned(barcode)
             barcode = ""
           else:
             barcode += key
@@ -133,7 +133,7 @@ def on_message(client, userdata, msg):
         print("[PRINT] Error printing:", e)
         publish_status(MQTT_TOPIC_PRINT_COMPLETED, "print_completed", f"Print job failed: {e}", False)
 
-def publish_qr_scanned(client, qr_code):
+def publish_qr_scanned(qr_code):
   data = {
     "type": "qr_scanned",
     "qrData": qr_code,
